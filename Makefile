@@ -12,7 +12,7 @@ OBJS     := $(CFILES:.c=.o)
 PREFIX  = arm-vita-eabi
 CC      = $(PREFIX)-gcc
 AR      = $(PREFIX)-ar
-CFLAGS  = -g -Wl,-q -O3 -ffast-math -mtune=cortex-a9 -mfpu=neon
+CFLAGS  = -g -Wl,-q -Ofast -mtune=cortex-a9 -mfpu=neon
 ASFLAGS = $(CFLAGS)
 
 all: $(TARGET).a

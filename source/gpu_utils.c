@@ -1,6 +1,7 @@
 #include <vitasdk.h>
 #include <stdlib.h>
 #include "gpu_utils.h"
+#include "allocator.h"
 
 #ifndef max
     #define max(a,b) ((a) > (b) ? (a) : (b))
@@ -191,26 +192,44 @@ palette* gpu_alloc_palette(const void* data, uint32_t w, uint32_t bpe){
 }
 
 void gpu_free_texture(texture* tex){
-	if (tex->data_UID != 0) gpu_unmap_free(tex->data_UID);
+	if (!tex) return;
+	if (tex->texdata) texmem_free(tex->texdata);
+	if (tex->data_UID) gpu_unmap_free(tex->data_UID);
 	tex->data_UID = 0;
 	tex->valid = 0;
+	tex->texdata = NULL;
 }
 
 void gpu_alloc_texture(uint32_t w, uint32_t h, SceGxmTextureFormat format, const void* data, texture* tex, uint8_t src_bpp, uint32_t (*read_cb)(void*),  void (*write_cb)(void*, uint32_t)){
 	if (tex->valid) gpu_free_texture(tex);
 	uint8_t bpp = tex_format_to_bytespp(format);
 	const int tex_size = w * h * bpp;
-	void *texture_data = gpu_alloc_map(
-		(use_vram ? SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW : SCE_KERNEL_MEMBLOCK_TYPE_USER_RW),
-		SCE_GXM_MEMORY_ATTRIB_READ | SCE_GXM_MEMORY_ATTRIB_WRITE,
-		tex_size, &tex->data_UID);
-	if (texture_data == NULL){ // If alloc fails, use the non-preferred memblock type
+
+	tex->data_UID = 0;
+	tex->texdata = NULL;
+
+	// try to alloc from texture heap (best)
+	void *texture_data = texmem_alloc(tex_size);
+
+	if (!texture_data){
+		// try to alloc new block from desired memory
 		texture_data = gpu_alloc_map(
-			(use_vram ? SCE_KERNEL_MEMBLOCK_TYPE_USER_RW : SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW),
-			SCE_GXM_MEMORY_ATTRIB_READ | SCE_GXM_MEMORY_ATTRIB_WRITE,
-			tex_size, &tex->data_UID);
+				(use_vram ? SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW : SCE_KERNEL_MEMBLOCK_TYPE_USER_RW),
+				SCE_GXM_MEMORY_ATTRIB_READ | SCE_GXM_MEMORY_ATTRIB_WRITE,
+				tex_size, &tex->data_UID
+		);
+	} else tex->texdata = texture_data;
+
+	if (!texture_data){
+		// try to alloc new block from undesired memory
+		texture_data = gpu_alloc_map(
+				(use_vram ? SCE_KERNEL_MEMBLOCK_TYPE_USER_RW : SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW),
+				SCE_GXM_MEMORY_ATTRIB_READ | SCE_GXM_MEMORY_ATTRIB_WRITE,
+				tex_size, &tex->data_UID
+		);
 	}
-	if (texture_data != NULL){
+
+	if (texture_data){
 		sceGxmColorSurfaceInit(&tex->gxm_sfc,
 			SCE_GXM_COLOR_FORMAT_A8B8G8R8,
 			SCE_GXM_COLOR_SURFACE_LINEAR,
@@ -251,28 +270,45 @@ void gpu_alloc_mipmaps(uint32_t w, uint32_t h, SceGxmTextureFormat format, const
 			w /= 2;
 			h /= 2;
 		}
-		SceUID data_UID;
-		void *texture_data = gpu_alloc_map(
-			(use_vram ? SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW : SCE_KERNEL_MEMBLOCK_TYPE_USER_RW),
-			SCE_GXM_MEMORY_ATTRIB_READ | SCE_GXM_MEMORY_ATTRIB_WRITE,
-			size, &data_UID);
-		if (texture_data == NULL){ // If alloc fails, use the non-preferred memblock type
+
+		SceUID data_UID = 0;
+		void *texdata = NULL;
+		void *texture_data = texmem_alloc(size);
+
+		if (!texture_data){
+			// try to alloc new block from desired memory
 			texture_data = gpu_alloc_map(
-				(use_vram ? SCE_KERNEL_MEMBLOCK_TYPE_USER_RW : SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW),
-				SCE_GXM_MEMORY_ATTRIB_READ | SCE_GXM_MEMORY_ATTRIB_WRITE,
-				size, &data_UID);
+					(use_vram ? SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW : SCE_KERNEL_MEMBLOCK_TYPE_USER_RW),
+					SCE_GXM_MEMORY_ATTRIB_READ | SCE_GXM_MEMORY_ATTRIB_WRITE,
+					size, &data_UID
+			);
+		} else texdata = texture_data;
+
+		if (!texture_data){
+			// try to alloc new block from undesired memory
+			texture_data = gpu_alloc_map(
+					(use_vram ? SCE_KERNEL_MEMBLOCK_TYPE_USER_RW : SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW),
+					SCE_GXM_MEMORY_ATTRIB_READ | SCE_GXM_MEMORY_ATTRIB_WRITE,
+					size, &data_UID
+			);
 		}
+
 		sceGxmColorSurfaceInit(&tex->gxm_sfc,
 			SCE_GXM_COLOR_FORMAT_A8B8G8R8,
 			SCE_GXM_COLOR_SURFACE_LINEAR,
 			SCE_GXM_COLOR_SURFACE_SCALE_NONE,
 			SCE_GXM_OUTPUT_REGISTER_SIZE_32BIT,
 			orig_w,orig_h,orig_w,texture_data);
+
 		memcpy(texture_data, sceGxmTextureGetData(&tex->gxm_tex), orig_w * orig_h * tex_format_to_bytespp(format));
+
 		gpu_free_texture(tex);
 		sceGxmTextureInitLinear(&tex->gxm_tex, texture_data, format, orig_w, orig_h, level);
+
 		tex->valid = 1;
 		tex->data_UID = data_UID;
+		tex->texdata = texdata;
+
 		uint32_t* curPtr = (uint32_t*)texture_data;
 		uint32_t curWidth = orig_w;
 		uint32_t curHeight = orig_h;

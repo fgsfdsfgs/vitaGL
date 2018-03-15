@@ -316,14 +316,14 @@ void vglVertexAttribPointer(GLuint index,  GLint size,  GLenum type,  GLboolean 
 
 // vgl*
 void vglEnd(void);
-void vglInit(uint32_t gpu_pool_size);
+void vglInit(uint32_t gpu_pool_size, GLboolean vram_usage, uint32_t texmem_size);
 void vglWaitVblankStart(GLboolean enable);
 void vglStartRendering();
 void vglStopRendering();
 void vglStopRenderingInit();
 void vglStopRenderingTerm();
 void vglUpdateCommonDialog();
-void vglUseVram(GLboolean usage);
+uint32_t vglTexMemUsed();
 
 #ifdef __cplusplus
 }

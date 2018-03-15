@@ -1,3 +1,8 @@
+#pragma once
+
+#ifndef _VGL_GPU_UTILS_H
+#define _VGL_GPU_UTILS_H
+
 #define ALIGN(x, a) (((x) + ((a) - 1)) & ~((a) - 1))
 
 typedef struct texture{
@@ -8,6 +13,7 @@ typedef struct texture{
 	SceGxmColorSurface gxm_sfc;
 	SceGxmDepthStencilSurface gxm_sfd;
 	SceUID depth_UID;
+	void *texdata;
 	uint8_t used;
 	uint8_t valid;
 	uint32_t type;
@@ -38,3 +44,5 @@ void gpu_free_palette(palette* pal);
 void gpu_prepare_rendertarget(texture* tex);
 void gpu_destroy_rendertarget(texture* tex);
 void gpu_alloc_mipmaps(uint32_t w, uint32_t h, SceGxmTextureFormat format, const void* data, int level, texture* tex);
+
+#endif
