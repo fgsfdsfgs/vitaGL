@@ -271,6 +271,10 @@ extern "C" {
 #define GL_FRAMEBUFFER                        0x8D40
 #define GL_COMPRESSED_RGBA_PVRTC_2BPPV2_IMG   0x9137
 #define GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG   0x9138
+#define GL_TEXTURE_WIDTH                      0x1000
+#define GL_TEXTURE_HEIGHT                     0x1001
+#define GL_TEXTURE_INTERNAL_FORMAT            0x1003
+#define GL_TEXTURE_COMPRESSED                 0x86A1
 
 #define GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS   2
 #define GL_MAX_TEXTURE_LOD_BIAS               31
@@ -393,6 +397,8 @@ void glTexImage2D(GLenum target, GLint level, GLint internalFormat, GLsizei widt
 void glTexParameterf(GLenum target, GLenum pname, GLfloat param);
 void glTexParameteri(GLenum target, GLenum pname, GLint param);
 void glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoffset, GLsizei width, GLsizei height, GLenum format, GLenum type, const GLvoid *pixels);
+void glGetTexLevelParameteriv(GLenum target, GLint level, GLenum pname, GLint *params);
+void glGetTexImage(GLenum target, GLint level, GLenum format, GLenum type, void *pixels);
 void glTranslatef(GLfloat x, GLfloat y, GLfloat z);
 void glUniform1f(GLint location, GLfloat v0);
 void glUniform1i(GLint location, GLint v0);

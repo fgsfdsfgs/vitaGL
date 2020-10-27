@@ -942,6 +942,91 @@ void glTexEnvi(GLenum target, GLenum pname, GLint param) {
 	}
 }
 
+void glGetTexLevelParameteriv(GLenum target, GLint level, GLenum pname, GLint *params) {
+	// Aliasing texture unit for cleaner code
+	texture_unit *tex_unit = &texture_units[server_texture_unit];
+	int texture2d_idx = tex_unit->tex_id;
+	texture *tex = &textures[texture2d_idx];
+
+	if (target != GL_TEXTURE_2D) {
+		vgl_error = GL_INVALID_ENUM;
+		return;
+	}
+
+	if (!texture2d_idx || !tex->data) {
+		vgl_error = GL_INVALID_OPERATION;
+		return;
+	}
+
+	switch (pname) {
+	case GL_TEXTURE_WIDTH:
+		*params = sceGxmTextureGetWidth(&tex->gxm_tex);
+		break;
+	case GL_TEXTURE_HEIGHT:
+		*params = sceGxmTextureGetHeight(&tex->gxm_tex);
+		break;
+	case GL_TEXTURE_INTERNAL_FORMAT:
+		*params = tex->type;
+		break;
+	case GL_TEXTURE_COMPRESSED:
+		switch (tex->type)
+		{
+		case GL_COMPRESSED_RGB_S3TC_DXT1_EXT:
+		case GL_COMPRESSED_RGBA_S3TC_DXT1_EXT:
+		case GL_COMPRESSED_RGBA_S3TC_DXT5_EXT:
+		case GL_COMPRESSED_RGB_PVRTC_2BPPV1_IMG:
+		case GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG:
+		case GL_COMPRESSED_RGB_PVRTC_4BPPV1_IMG:
+		case GL_COMPRESSED_RGBA_PVRTC_4BPPV1_IMG:
+		case GL_COMPRESSED_RGBA_PVRTC_2BPPV2_IMG:
+		case GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG:
+			*params = GL_TRUE;
+			break;
+		default:
+			*params = GL_FALSE;
+			break;
+		}
+		break;
+	default:
+		vgl_error = GL_INVALID_ENUM;
+		break;
+	}
+}
+
+
+void glGetTexImage(GLenum target, GLint level, GLenum format, GLenum type, void *pixels) {
+	// Aliasing texture unit for cleaner code
+	texture_unit *tex_unit = &texture_units[server_texture_unit];
+	int texture2d_idx = tex_unit->tex_id;
+	texture *tex = &textures[texture2d_idx];
+
+	if (target != GL_TEXTURE_2D) {
+		vgl_error = GL_INVALID_ENUM;
+		return;
+	}
+
+	if (!texture2d_idx || !tex->data || !pixels) {
+		vgl_error = GL_INVALID_OPERATION;
+		return;
+	}
+
+	if (format != tex->type)
+	{
+		vgl_error = GL_INVALID_ENUM;
+		return;
+	}
+
+	const uint8_t bpp = tex_format_to_bytespp(sceGxmTextureGetFormat(&tex->gxm_tex));
+	const unsigned int w = sceGxmTextureGetWidth(&tex->gxm_tex);
+	const unsigned int h = sceGxmTextureGetHeight(&tex->gxm_tex);
+	const unsigned int src_stride = ALIGN(w, 8) * bpp;
+	const unsigned int dst_stride = w * bpp;
+	const uint8_t *src = (const uint8_t *)tex->data;
+	uint8_t *dst = pixels;
+	for (unsigned int y = 0; y < h; ++y, src += src_stride, dst += dst_stride)
+		memcpy_neon(dst, src, dst_stride);
+}
+
 void *vglGetTexDataPointer(GLenum target) {
 	// Aliasing texture unit for cleaner code
 	texture_unit *tex_unit = &texture_units[server_texture_unit];
