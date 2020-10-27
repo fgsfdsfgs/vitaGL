@@ -472,6 +472,7 @@ void glEnd(void) {
 		sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_clip_plane0, 0, 1, &clipplane0);
 		sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_clip_plane0_eq, 0, 4, &clip_plane0_eq.x);
 		sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_mv, 0, 16, (const float *)modelview_matrix);
+		sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_texmat, 0, 16, (const float *)texture_matrix);
 
 		// Setting in use texture
 		sceGxmSetFragmentTexture(gxm_context, 0, &textures[texture2d_idx].gxm_tex);

@@ -80,6 +80,7 @@ const SceGxmProgramParameter *texture2d_tex_env;
 const SceGxmProgramParameter *texture2d_clip_plane0;
 const SceGxmProgramParameter *texture2d_clip_plane0_eq;
 const SceGxmProgramParameter *texture2d_mv;
+const SceGxmProgramParameter *texture2d_texmat;
 const SceGxmProgramParameter *texture2d_fog_mode;
 const SceGxmProgramParameter *texture2d_fog_near;
 const SceGxmProgramParameter *texture2d_fog_far;
@@ -103,6 +104,7 @@ const SceGxmProgramParameter *texture2d_rgba_tex_env;
 const SceGxmProgramParameter *texture2d_rgba_clip_plane0;
 const SceGxmProgramParameter *texture2d_rgba_clip_plane0_eq;
 const SceGxmProgramParameter *texture2d_rgba_mv;
+const SceGxmProgramParameter *texture2d_rgba_texmat;
 const SceGxmProgramParameter *texture2d_rgba_fog_mode;
 const SceGxmProgramParameter *texture2d_rgba_fog_near;
 const SceGxmProgramParameter *texture2d_rgba_fog_far;
@@ -522,6 +524,9 @@ void vglInitWithCustomSizes(uint32_t gpu_pool_size, int width, int height, int r
 	texture2d_mv = sceGxmProgramFindParameterByName(
 		texture2d_vertex_program, "modelview");
 
+	texture2d_texmat = sceGxmProgramFindParameterByName(
+		texture2d_vertex_program, "texmat");
+
 	texture2d_fog_near = sceGxmProgramFindParameterByName(
 		texture2d_fragment_program, "fog_near");
 
@@ -603,6 +608,9 @@ void vglInitWithCustomSizes(uint32_t gpu_pool_size, int width, int height, int r
 	texture2d_rgba_mv = sceGxmProgramFindParameterByName(
 		texture2d_rgba_vertex_program, "modelview");
 
+	texture2d_rgba_texmat = sceGxmProgramFindParameterByName(
+		texture2d_rgba_vertex_program, "texmat");
+
 	texture2d_rgba_fog_near = sceGxmProgramFindParameterByName(
 		texture2d_rgba_fragment_program, "fog_near");
 
@@ -669,6 +677,8 @@ void vglInitWithCustomSizes(uint32_t gpu_pool_size, int width, int height, int r
 	sceGxmShaderPatcherCreateMaskUpdateFragmentProgram(gxm_shader_patcher, &scissor_test_fragment_program);
 
 	scissor_test_vertices = gpu_alloc_mapped(1 * sizeof(vector4f), &type);
+
+	matrix4x4_identity(texture_matrix);
 
 	// Allocate temp pool for non-VBO drawing
 	gpu_pool_init(gpu_pool_size);
@@ -1407,12 +1417,14 @@ void glDrawArrays(GLenum mode, GLint first, GLsizei count) {
 					sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_rgba_clip_plane0, 0, 1, &clipplane0);
 					sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_rgba_clip_plane0_eq, 0, 4, &clip_plane0_eq.x);
 					sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_rgba_mv, 0, 16, (const float *)modelview_matrix);
+					sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_rgba_texmat, 0, 16, (const float *)texture_matrix);
 				} else {
 					sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_wvp, 0, 16, (const float *)mvp_matrix);
 					float clipplane0 = (float)clip_plane0;
 					sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_clip_plane0, 0, 1, &clipplane0);
 					sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_clip_plane0_eq, 0, 4, &clip_plane0_eq.x);
 					sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_mv, 0, 16, (const float *)modelview_matrix);
+					sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_texmat, 0, 16, (const float *)texture_matrix);
 				}
 				sceGxmSetFragmentTexture(gxm_context, 0, &textures[texture2d_idx].gxm_tex);
 				vector3f *vertices = NULL;
