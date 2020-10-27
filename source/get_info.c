@@ -35,6 +35,33 @@ static const GLubyte *extensions = "VGL_EXT_gpu_objects_array VGL_EXT_gxp_shader
  * ------------------------------
  */
 
+static GLenum blend_factor_gl_to_gxm(const SceGxmBlendFactor f) {
+	switch (f) {
+	case SCE_GXM_BLEND_FACTOR_ONE:
+		return GL_ONE;
+	case SCE_GXM_BLEND_FACTOR_SRC_COLOR:
+		return GL_SRC_COLOR;
+	case SCE_GXM_BLEND_FACTOR_ONE_MINUS_SRC_COLOR:
+		return GL_ONE_MINUS_SRC_COLOR;
+	case SCE_GXM_BLEND_FACTOR_SRC_ALPHA:
+		return GL_SRC_ALPHA;
+	case SCE_GXM_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA:
+		return GL_ONE_MINUS_SRC_ALPHA;
+	case SCE_GXM_BLEND_FACTOR_DST_COLOR:
+		return GL_DST_COLOR;
+	case SCE_GXM_BLEND_FACTOR_ONE_MINUS_DST_COLOR:
+		return GL_ONE_MINUS_DST_COLOR;
+	case SCE_GXM_BLEND_FACTOR_DST_ALPHA:
+		return GL_DST_ALPHA;
+	case SCE_GXM_BLEND_FACTOR_ONE_MINUS_DST_ALPHA:
+		return GL_ONE_MINUS_DST_ALPHA;
+	case SCE_GXM_BLEND_FACTOR_SRC_ALPHA_SATURATE:
+		return GL_SRC_ALPHA_SATURATE;
+	default:
+		return GL_ZERO;
+	}
+}
+
 const GLubyte *glGetString(GLenum name) {
 	switch (name) {
 	case GL_VENDOR: // Vendor
@@ -180,6 +207,20 @@ void glGetIntegerv(GLenum pname, GLint *data) {
 		data[6] = GL_COMPRESSED_RGBA_PVRTC_2BPPV1_IMG;
 		data[7] = GL_COMPRESSED_RGBA_PVRTC_2BPPV2_IMG;
 		data[8] = GL_COMPRESSED_RGBA_PVRTC_4BPPV2_IMG;
+		break;
+	case GL_BLEND_DST:
+	case GL_BLEND_DST_RGB:
+		data[0] = blend_factor_gl_to_gxm(blend_dfactor_rgb);
+		break;
+	case GL_BLEND_SRC:
+	case GL_BLEND_SRC_RGB:
+		data[0] = blend_factor_gl_to_gxm(blend_sfactor_rgb);
+		break;
+	case GL_BLEND_DST_ALPHA:
+		data[0] = blend_factor_gl_to_gxm(blend_dfactor_a);
+		break;
+	case GL_BLEND_SRC_ALPHA:
+		data[0] = blend_factor_gl_to_gxm(blend_sfactor_a);
 		break;
 	default:
 		SET_GL_ERROR(GL_INVALID_ENUM)

@@ -117,6 +117,8 @@ extern "C" {
 #define GL_MODELVIEW_MATRIX                   0x0BA6
 #define GL_PROJECTION_MATRIX                  0x0BA7
 #define GL_ALPHA_TEST                         0x0BC0
+#define GL_BLEND_DST                          0x0BE0
+#define GL_BLEND_SRC                          0x0BE1
 #define GL_BLEND                              0x0BE2
 #define GL_SCISSOR_BOX                        0x0C10
 #define GL_SCISSOR_TEST                       0x0C11
