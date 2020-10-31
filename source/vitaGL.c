@@ -1711,12 +1711,14 @@ void glDrawElements(GLenum mode, GLsizei count, GLenum type, const GLvoid *gl_in
 					sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_rgba_clip_plane0, 0, 1, &clipplane0);
 					sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_rgba_clip_plane0_eq, 0, 4, &clip_plane0_eq.x);
 					sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_rgba_mv, 0, 16, (const float *)modelview_matrix);
+					sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_rgba_texmat, 0, 16, (const float *)texture_matrix);
 				} else {
 					sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_wvp, 0, 16, (const float *)mvp_matrix);
 					float clipplane0 = (float)clip_plane0;
 					sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_clip_plane0, 0, 1, &clipplane0);
 					sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_clip_plane0_eq, 0, 4, &clip_plane0_eq.x);
 					sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_mv, 0, 16, (const float *)modelview_matrix);
+					sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_texmat, 0, 16, (const float *)texture_matrix);
 				}
 				sceGxmSetFragmentTexture(gxm_context, 0, &textures[texture2d_idx].gxm_tex);
 				vector3f *vertices = NULL;
@@ -2195,12 +2197,14 @@ void vglDrawObjects(GLenum mode, GLsizei count, GLboolean implicit_wvp) {
 						sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_rgba_clip_plane0, 0, 1, &clipplane0);
 						sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_rgba_clip_plane0_eq, 0, 4, &clip_plane0_eq.x);
 						sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_rgba_mv, 0, 16, (const float *)modelview_matrix);
+						sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_rgba_texmat, 0, 16, (const float *)texture_matrix);
 					} else {
 						sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_wvp, 0, 16, (const float *)mvp_matrix);
 						float clipplane0 = (float)clip_plane0;
 						sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_clip_plane0, 0, 1, &clipplane0);
 						sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_clip_plane0_eq, 0, 4, &clip_plane0_eq.x);
 						sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_mv, 0, 16, (const float *)modelview_matrix);
+						sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_texmat, 0, 16, (const float *)texture_matrix);
 					}
 					sceGxmSetFragmentTexture(gxm_context, 0, &textures[texture2d_idx].gxm_tex);
 					sceGxmSetVertexStream(gxm_context, 0, tex_unit->vertex_object);
