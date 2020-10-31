@@ -29,7 +29,7 @@
 #define TEXTURES_NUM 16384 // Available textures
 #define COMPRESSED_TEXTURE_FORMATS_NUM 9 // The number of supported texture formats.
 #define MODELVIEW_STACK_DEPTH 32 // Depth of modelview matrix stack
-#define GENERIC_STACK_DEPTH 2 // Depth of generic matrix stack
+#define GENERIC_STACK_DEPTH 8 // Depth of generic matrix stack
 #define DISPLAY_WIDTH_DEF 960 // Default display width in pixels
 #define DISPLAY_HEIGHT_DEF 544 // Default display height in pixels
 #define DISPLAY_BUFFER_COUNT 2 // Display buffers to use
