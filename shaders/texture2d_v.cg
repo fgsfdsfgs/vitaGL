@@ -21,5 +21,5 @@
 	}
 	
 	vPosition = mul(pos4, wvp);
-	vTexcoord = mul(float4(texcoord, 0.f, 1.f), texmat).xy;
+	vTexcoord = mul(texmat, float4(texcoord, 0.f, 1.f)).xy;
 }
