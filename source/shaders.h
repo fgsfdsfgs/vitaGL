@@ -57,27 +57,16 @@ extern const SceGxmProgram *rgba_fragment_program;
 
 // Texture2D shader
 extern SceGxmShaderPatcherId texture2d_vertex_id;
-extern SceGxmShaderPatcherId texture2d_fragment_id;
 extern const SceGxmProgramParameter *texture2d_position;
 extern const SceGxmProgramParameter *texture2d_texcoord;
 extern const SceGxmProgramParameter *texture2d_wvp;
-extern const SceGxmProgramParameter *texture2d_alpha_cut;
-extern const SceGxmProgramParameter *texture2d_alpha_op;
 extern const SceGxmProgramParameter *texture2d_tint_color;
 extern const SceGxmProgramParameter *texture2d_tex_env;
 extern const SceGxmProgramParameter *texture2d_clip_plane0;
 extern const SceGxmProgramParameter *texture2d_clip_plane0_eq;
 extern const SceGxmProgramParameter *texture2d_mv;
 extern const SceGxmProgramParameter *texture2d_texmat;
-extern const SceGxmProgramParameter *texture2d_fog_mode;
-extern const SceGxmProgramParameter *texture2d_fog_near;
-extern const SceGxmProgramParameter *texture2d_fog_far;
-extern const SceGxmProgramParameter *texture2d_fog_density;
-extern const SceGxmProgramParameter *texture2d_fog_color;
-extern const SceGxmProgramParameter *texture2d_tex_env_color;
 extern SceGxmVertexProgram *texture2d_vertex_program_patched;
-extern SceGxmFragmentProgram *texture2d_fragment_program_patched;
-extern const SceGxmProgram *texture2d_fragment_program;
 
 // Texture2D+RGBA shader
 extern SceGxmShaderPatcherId texture2d_rgba_vertex_id;
