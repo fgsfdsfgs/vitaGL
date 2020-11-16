@@ -75,6 +75,7 @@ static const struct {
 	{ "glGetIntegerv", (void *)glGetIntegerv },
 	{ "glGetShaderInfoLog", (void *)glGetShaderInfoLog },
 	{ "glGetShaderiv", (void *)glGetShaderiv },
+	{ "glGetString", (void *)glGetString },
 	{ "glGetUniformLocation", (void *)glGetUniformLocation },
 	{ "glIsEnabled", (void *)glIsEnabled },
 	{ "glLineWidth", (void *)glLineWidth },
