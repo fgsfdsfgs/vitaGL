@@ -444,6 +444,8 @@ void vglStopRenderingTerm(void) {
 
 	// Resetting vitaGL mempool
 	gpu_pool_reset();
+	// Resetting immediate vertex buffer pointers
+	vglResetImmediateBuffer();
 }
 
 void vglStopRendering() {

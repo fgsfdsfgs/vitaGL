@@ -23,571 +23,206 @@
 
 #include "shared.h"
 
-// Vertex list struct
-typedef struct vertexList {
-	vector3f v;
-	void *next;
-} vertexList;
+#define DEFAULT_VTX_COUNT 16384
 
-// Color vertex list struct
-typedef struct rgbaList {
-	vector4f v;
-	void *next;
-} rgbaList;
-
-// Texture coord list struct
-typedef struct uvList {
-	vector2f v;
-	void *next;
-} uvList;
-
-static vertexList *model_vertices = NULL; // Pointer to vertex list
-static vertexList *last_vert = NULL; // Pointer to last element in vertex list
-static rgbaList *model_color = NULL; // Pointer to color vertex list
-static rgbaList *last_clr = NULL; // Pointer to last element in color vertex list
-static uvList *model_uv = NULL; // Pointer to texcoord list
-static uvList *last_uv = NULL; // Pointer to last element in texcoord list
-static uint64_t vertex_count = 0; // Vertex counter for vertex list
-static SceGxmPrimitiveType prim; // Current in use primitive for rendering
-static SceGxmPrimitiveTypeExtra prim_extra = SCE_GXM_PRIMITIVE_NONE; // Current in use non native primitive for rendering
-static uint8_t np = 0xFF; // Number of expected vertices per element for current in use primitive
+static GLuint vtx_max_vertices = 0;
+static unsigned short *vtx_idx;
+static GLfloat *vtx_pos, *vtx_posptr, *vtx_posstart;
+static GLfloat *vtx_tex, *vtx_texptr, *vtx_texstart;
+static GLfloat *vtx_col, *vtx_colptr, *vtx_colstart;
+static int vtx_num = 0;
+static GLenum vtx_curprim = 0;
 
 vector4f current_color = { 1.0f, 1.0f, 1.0f, 1.0f }; // Current in use color
 
-static void purge_vertex_list() {
-	vertexList *old;
-	rgbaList *old2;
-	uvList *old3;
-
-	// Purging color and vertex lists
-	while (model_vertices != NULL) {
-		old = model_vertices;
-		old2 = model_color;
-		model_vertices = model_vertices->next;
-		model_color = model_color->next;
-		free(old);
-		free(old2);
+void vglResetImmediateBuffer(void) {
+	if (vtx_curprim != 0) {
+		// don't reset in the middle of a model
+		return;
 	}
-
-	// Purging texcoord list
-	while (model_uv != NULL) {
-		old3 = model_uv;
-		model_uv = model_uv->next;
-		free(old3);
-	}
+	vtx_posptr = vtx_posstart = vtx_pos;
+	vtx_texptr = vtx_texstart = vtx_tex;
+	vtx_colptr = vtx_colstart = vtx_col;
 }
 
-/*
- * ------------------------------
- * - IMPLEMENTATION STARTS HERE -
- * ------------------------------
- */
-
-void glVertex3f(GLfloat x, GLfloat y, GLfloat z) {
-#ifndef SKIP_ERROR_HANDLING
-	// Error handling
-	if (phase != MODEL_CREATION) {
-		SET_GL_ERROR(GL_INVALID_OPERATION)
-	}
-#endif
-
-	// Adding a new element to color and vertex lists
-	if (model_vertices == NULL) {
-		model_vertices = last_vert = (vertexList *)malloc(sizeof(vertexList));
-		model_color = last_clr = (rgbaList *)malloc(sizeof(rgbaList));
-	} else {
-		last_vert->next = (vertexList *)malloc(sizeof(vertexList));
-		last_clr->next = (rgbaList *)malloc(sizeof(rgbaList));
-		last_vert = last_vert->next;
-		last_clr = last_clr->next;
+GLboolean vglSetImmediateBufferSize(const GLuint numverts) {
+	if (numverts > 0xFFFF || numverts == 0) {
+		vgl_error = GL_INVALID_VALUE;
+		return GL_FALSE;
 	}
 
-	// Properly populating the new element
-	last_vert->v.x = x;
-	last_vert->v.y = y;
-	last_vert->v.z = z;
-	memcpy_neon(&last_clr->v, &current_color.r, sizeof(vector4f));
-	last_clr->next = last_vert->next = NULL;
+	if (vtx_curprim != 0) {
+		// don't realloc in the middle of a model
+		vgl_error = GL_INVALID_OPERATION;
+		return GL_FALSE;
+	}
 
-	// Increasing vertex counter
-	vertex_count++;
+	vtx_pos = realloc(vtx_pos, sizeof(GLfloat) * 3 * numverts);
+	vtx_tex = realloc(vtx_tex, sizeof(GLfloat) * 2 * numverts);
+	vtx_col = realloc(vtx_col, sizeof(GLfloat) * 4 * numverts);
+	vtx_idx = realloc(vtx_idx, sizeof(GLshort) * 1 * numverts);
+
+	if (!vtx_pos || !vtx_tex || !vtx_col || !vtx_idx) {
+		vgl_error = GL_OUT_OF_MEMORY;
+		return GL_FALSE;
+	}
+
+	for (GLuint i = 0; i < numverts; ++i) {
+		vtx_idx[i] = i; // indices are always sequential here
+	}
+
+	vtx_max_vertices = numverts;
+	vglResetImmediateBuffer();
+
+	return GL_TRUE;
 }
 
-void glVertex3fv(const GLfloat *v) {
-#ifndef SKIP_ERROR_HANDLING
-	// Error handling
-	if (phase != MODEL_CREATION) {
+void glBegin(GLenum prim) {
+	if (vtx_pos == NULL) {
+		vglSetImmediateBufferSize(DEFAULT_VTX_COUNT);
+	}
+
+	// already in glBegin ... glEnd
+	if (vtx_curprim != 0) {
 		SET_GL_ERROR(GL_INVALID_OPERATION)
 	}
-#endif
 
-	// Adding a new element to color and vertex lists
-	if (model_vertices == NULL) {
-		model_vertices = last_vert = (vertexList *)malloc(sizeof(vertexList));
-		model_color = last_clr = (rgbaList *)malloc(sizeof(rgbaList));
-	} else {
-		last_vert->next = (vertexList *)malloc(sizeof(vertexList));
-		last_clr->next = (rgbaList *)malloc(sizeof(rgbaList));
-		last_vert = last_vert->next;
-		last_clr = last_clr->next;
-	}
-
-	// Properly populating the new element
-	memcpy_neon(&last_vert->v, v, sizeof(vector3f));
-	memcpy_neon(&last_clr->v, &current_color.r, sizeof(vector4f));
-	last_clr->next = last_vert->next = NULL;
-
-	// Increasing vertex counter
-	vertex_count++;
+	vtx_num = 0;
+	vtx_curprim = prim;
 }
 
 void glVertex2f(GLfloat x, GLfloat y) {
-	glVertex3f(x, y, 0.0f);
+	glVertex3f(x, y, 0.f);
 }
 
-void glColor3f(GLfloat red, GLfloat green, GLfloat blue) {
-	// Setting current color value
-	current_color.r = red;
-	current_color.g = green;
-	current_color.b = blue;
-	current_color.a = 1.0f;
+void glVertex2i(GLint x, GLint y) {
+	glVertex3f(x, y, 0.f);
+}
+
+void glVertex3fv(const GLfloat *v) {
+	glVertex3f(v[0], v[1], v[2]);
+}
+
+void glVertex3i(GLint x, GLint y, GLint z) {
+	glVertex3f(x, y, z);
+}
+
+void glVertex3f(GLfloat x, GLfloat y, GLfloat z) {
+#ifndef SKIP_ERROR_HANDLING
+	if (vtx_curprim == 0) {
+		SET_GL_ERROR(GL_INVALID_OPERATION)
+	}
+#endif
+	*(vtx_colptr++) = current_color.r;
+	*(vtx_colptr++) = current_color.g;
+	*(vtx_colptr++) = current_color.b;
+	*(vtx_colptr++) = current_color.a;
+	*(vtx_posptr++) = x;
+	*(vtx_posptr++) = y;
+	*(vtx_posptr++) = z;
+	vtx_num++;
+}
+
+void glTexCoord2i(GLint u, GLint v) {
+	glTexCoord2f(u, v);
+}
+
+void glTexCoord2iv(const GLint *v) {
+	glTexCoord2f(v[0], v[1]);
+}
+
+void glTexCoord2fv(const GLfloat *v) {
+	glTexCoord2f(v[0], v[1]);
+}
+
+void glTexCoord2f(GLfloat u, GLfloat v) {
+#ifndef SKIP_ERROR_HANDLING
+	// this is technically incorrect, but we don't have a "current texture coordinate"
+	// and instead just fill the buffer immediately
+	if (vtx_curprim == 0) {
+		SET_GL_ERROR(GL_INVALID_OPERATION)
+	}
+#endif
+	*(vtx_texptr++) = u;
+	*(vtx_texptr++) = v;
+}
+
+void glColor3ub(GLubyte r, GLubyte g, GLubyte b) {
+	glColor4f(r / 255.f, g / 255.f, b / 255.f, 1.f);
+}
+
+void glColor3ubv(const GLubyte *v) {
+	glColor4f(v[0] / 255.f, v[1] / 255.f, v[2] / 255.f, 1.f);
+}
+
+void glColor3f(GLfloat r, GLfloat g, GLfloat b) {
+	glColor4f(r, g, b, 1.f);
 }
 
 void glColor3fv(const GLfloat *v) {
-	// Setting current color value
-	memcpy_neon(&current_color.r, v, sizeof(vector3f));
-	current_color.a = 1.0f;
+	glColor4f(v[0], v[1], v[2], 1.f);
 }
 
-void glColor3ub(GLubyte red, GLubyte green, GLubyte blue) {
-	// Setting current color value
-	current_color.r = (1.0f * red) / 255.0f;
-	current_color.g = (1.0f * green) / 255.0f;
-	current_color.b = (1.0f * blue) / 255.0f;
-	current_color.a = 1.0f;
+void glColor4ub(GLubyte r, GLubyte g, GLubyte b, GLubyte a) {
+	glColor4f(r / 255.f, g / 255.f, b / 255.f, a / 255.f);
 }
 
-void glColor3ubv(const GLubyte *c) {
-	// Setting current color value
-	current_color.r = (1.0f * c[0]) / 255.0f;
-	current_color.g = (1.0f * c[1]) / 255.0f;
-	current_color.b = (1.0f * c[2]) / 255.0f;
-	current_color.a = 1.0f;
-}
-
-void glColor4f(GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha) {
-	// Setting current color value
-	current_color.r = red;
-	current_color.g = green;
-	current_color.b = blue;
-	current_color.a = alpha;
+void glColor4ubv(const GLubyte *v) {
+	glColor4f(v[0] / 255.f, v[1] / 255.f, v[2] / 255.f, v[3] / 255.f);
 }
 
 void glColor4fv(const GLfloat *v) {
-	// Setting current color value
-	memcpy_neon(&current_color.r, v, sizeof(vector4f));
+	glColor4f(v[0], v[1], v[2], v[3]);
 }
 
-void glColor4ub(GLubyte red, GLubyte green, GLubyte blue, GLubyte alpha) {
-	current_color.r = (1.0f * red) / 255.0f;
-	current_color.g = (1.0f * green) / 255.0f;
-	current_color.b = (1.0f * blue) / 255.0f;
-	current_color.a = (1.0f * alpha) / 255.0f;
-}
-
-void glColor4ubv(const GLubyte *c) {
-	// Setting current color value
-	current_color.r = (1.0f * c[0]) / 255.0f;
-	current_color.g = (1.0f * c[1]) / 255.0f;
-	current_color.b = (1.0f * c[2]) / 255.0f;
-	current_color.a = (1.0f * c[3]) / 255.0f;
-}
-
-void glTexCoord2fv(GLfloat *f) {
-#ifndef SKIP_ERROR_HANDLING
-	// Error handling
-	if (phase != MODEL_CREATION) {
-		SET_GL_ERROR(GL_INVALID_OPERATION)
-	}
-#endif
-
-	// Adding a new element to texcoord list
-	if (model_uv == NULL) {
-		model_uv = last_uv = (uvList *)malloc(sizeof(uvList));
-	} else {
-		last_uv->next = (uvList *)malloc(sizeof(uvList));
-		last_uv = last_uv->next;
-	}
-
-	// Properly populating the new element
-	last_uv->v.x = f[0];
-	last_uv->v.y = f[1];
-	last_uv->next = NULL;
-}
-
-void glTexCoord2f(GLfloat s, GLfloat t) {
-#ifndef SKIP_ERROR_HANDLING
-	// Error handling
-	if (phase != MODEL_CREATION) {
-		SET_GL_ERROR(GL_INVALID_OPERATION)
-	}
-#endif
-
-	// Adding a new element to texcoord list
-	if (model_uv == NULL) {
-		model_uv = last_uv = (uvList *)malloc(sizeof(uvList));
-	} else {
-		last_uv->next = (uvList *)malloc(sizeof(uvList));
-		last_uv = last_uv->next;
-	}
-
-	// Properly populating the new element
-	last_uv->v.x = s;
-	last_uv->v.y = t;
-	last_uv->next = NULL;
-}
-
-void glTexCoord2i(GLint s, GLint t) {
-#ifndef SKIP_ERROR_HANDLING
-	// Error handling
-	if (phase != MODEL_CREATION) {
-		SET_GL_ERROR(GL_INVALID_OPERATION)
-	}
-#endif
-
-	// Adding a new element to texcoord list
-	if (model_uv == NULL) {
-		model_uv = last_uv = (uvList *)malloc(sizeof(uvList));
-	} else {
-		last_uv->next = (uvList *)malloc(sizeof(uvList));
-		last_uv = last_uv->next;
-	}
-
-	// Properly populating the new element
-	last_uv->v.x = s;
-	last_uv->v.y = t;
-	last_uv->next = NULL;
-}
-
-void glArrayElement(GLint i) {
-#ifndef SKIP_ERROR_HANDLING
-	// Error handling
-	if (i < 0) {
-		SET_GL_ERROR(GL_INVALID_VALUE)
-	}
-#endif
-
-	// Aliasing client texture unit for better code readability
-	texture_unit *tex_unit = &texture_units[client_texture_unit];
-
-	// Checking if current texture unit has GL_VERTEX_ARRAY enabled
-	if (tex_unit->vertex_array_state) {
-		// Calculating offset of requested element
-		uint8_t *ptr;
-		if (tex_unit->vertex_array.stride == 0)
-			ptr = ((uint8_t *)tex_unit->vertex_array.pointer) + (i * (tex_unit->vertex_array.num * tex_unit->vertex_array.size));
-		else
-			ptr = ((uint8_t *)tex_unit->vertex_array.pointer) + (i * tex_unit->vertex_array.stride);
-
-		// Adding a new element to vertex and color lists
-		if (model_vertices == NULL) {
-			model_vertices = last_vert = (vertexList *)malloc(sizeof(vertexList));
-			model_color = last_clr = (rgbaList *)malloc(sizeof(rgbaList));
-		} else {
-			last_vert->next = (vertexList *)malloc(sizeof(vertexList));
-			last_clr->next = (rgbaList *)malloc(sizeof(rgbaList));
-			last_vert = last_vert->next;
-			last_clr = last_clr->next;
-		}
-		last_vert->next = NULL;
-		last_clr->next = NULL;
-
-		// Populating new vertex element
-		memcpy_neon(&last_vert->v, ptr, tex_unit->vertex_array.size * tex_unit->vertex_array.num);
-
-		// Checking if current texture unit has GL_COLOR_ARRAY enabled
-		if (tex_unit->color_array_state) {
-			// Calculating offset of requested element
-			uint8_t *ptr_clr;
-			if (tex_unit->color_array.stride == 0)
-				ptr_clr = ((uint8_t *)tex_unit->color_array.pointer) + (i * (tex_unit->color_array.num * tex_unit->color_array.size));
-			else
-				ptr_clr = ((uint8_t *)tex_unit->color_array.pointer) + (i * tex_unit->color_array.stride);
-
-			// Populating new color element
-			last_clr->v.a = 1.0f;
-			memcpy_neon(&last_clr->v, ptr_clr, tex_unit->color_array.size * tex_unit->color_array.num);
-
-		} else {
-			// Populating new color element with current color
-			memcpy_neon(&last_clr->v, &current_color.r, sizeof(vector4f));
-		}
-
-		// Checking if current texture unit has GL_TEXTURE_COORD_ARRAY enabled
-		if (tex_unit->texture_array_state) {
-			// Calculating offset of requested element
-			uint8_t *ptr_tex;
-			if (tex_unit->texture_array.stride == 0)
-				ptr_tex = ((uint8_t *)tex_unit->texture_array.pointer) + (i * (tex_unit->texture_array.num * tex_unit->texture_array.size));
-			else
-				ptr_tex = ((uint8_t *)tex_unit->texture_array.pointer) + (i * tex_unit->texture_array.stride);
-
-			// Adding a new element to texcoord list
-			if (model_uv == NULL) {
-				model_uv = last_uv = (uvList *)malloc(sizeof(uvList));
-			} else {
-				last_uv->next = (uvList *)malloc(sizeof(uvList));
-				last_uv = last_uv->next;
-			}
-
-			// Populating new texcoord element
-			memcpy_neon(&last_uv->v, ptr_tex, tex_unit->vertex_array.size * 2);
-			last_uv->next = NULL;
-		}
-	}
-}
-
-void glBegin(GLenum mode) {
-#ifndef SKIP_ERROR_HANDLING
-	// Error handling
-	if (phase == MODEL_CREATION) {
-		SET_GL_ERROR(GL_INVALID_OPERATION)
-	}
-#endif
-
-	// Changing current openGL machine state
-	phase = MODEL_CREATION;
-
-	// Translating primitive to sceGxm one
-	prim_extra = SCE_GXM_PRIMITIVE_NONE;
-	switch (mode) {
-	case GL_POINTS:
-		prim = SCE_GXM_PRIMITIVE_POINTS;
-		np = 1;
-		break;
-	case GL_LINES:
-		prim = SCE_GXM_PRIMITIVE_LINES;
-		np = 2;
-		break;
-	case GL_TRIANGLES:
-		prim = SCE_GXM_PRIMITIVE_TRIANGLES;
-		np = 3;
-		break;
-	case GL_TRIANGLE_STRIP:
-		prim = SCE_GXM_PRIMITIVE_TRIANGLE_STRIP;
-		np = 1;
-		break;
-	case GL_TRIANGLE_FAN:
-		prim = SCE_GXM_PRIMITIVE_TRIANGLE_FAN;
-		np = 1;
-		break;
-	case GL_QUADS:
-		prim = SCE_GXM_PRIMITIVE_TRIANGLES;
-		prim_extra = SCE_GXM_PRIMITIVE_QUADS;
-		np = 4;
-		break;
-	default:
-		SET_GL_ERROR(GL_INVALID_ENUM)
-		break;
-	}
-
-	// Resetting vertex count
-	vertex_count = 0;
+void glColor4f(GLfloat r, GLfloat g, GLfloat b, GLfloat a) {
+	current_color.r = r;
+	current_color.g = g;
+	current_color.b = b;
+	current_color.a = a;
 }
 
 void glEnd(void) {
-#ifndef SKIP_ERROR_HANDLING
-	// Integrity checks
-	if (vertex_count == 0 || ((vertex_count % np) != 0))
-		return;
-
-	// Error handling
-	if (phase != MODEL_CREATION) {
+	if (vtx_curprim == 0 || vtx_num == 0) {
 		SET_GL_ERROR(GL_INVALID_OPERATION)
-		return;
-	}
-#endif
-
-	// Changing current openGL machine state
-	phase = NONE;
-
-	// Checking if we can totally skip drawing cause of culling mode
-	if (no_polygons_mode && ((prim == SCE_GXM_PRIMITIVE_TRIANGLES) || (prim >= SCE_GXM_PRIMITIVE_TRIANGLE_STRIP))) {
-		purge_vertex_list();
-		vertex_count = 0;
-		return;
 	}
 
-	// Aliasing server texture unit and texture id for better code readability
-	texture_unit *tex_unit = &texture_units[server_texture_unit];
-	int texture2d_idx = tex_unit->tex_id;
+	// save current array states
+	texture_unit *tex_unit = &texture_units[client_texture_unit];
+	const GLboolean varr_state = tex_unit->vertex_array_state;
+	const GLboolean carr_state = tex_unit->color_array_state;
+	const GLenum carr_type = tex_unit->color_object_type;
+	const GLboolean tarr_state = tex_unit->texture_array_state;
 
-	// Calculating mvp matrix
-	if (mvp_modified) {
-		matrix4x4_multiply(mvp_matrix, projection_matrix, modelview_matrix);
-		mvp_modified = GL_FALSE;
-	}
+	tex_unit->vertex_array_state = GL_TRUE;
+	tex_unit->color_array_state = GL_TRUE;
 
-	// Checking if we have to write a texture
-	if ((server_texture_unit >= 0) && (tex_unit->enabled) && (model_uv != NULL) && (textures[texture2d_idx].valid)) {
-		// Setting proper vertex and fragment programs
-		sceGxmSetVertexProgram(gxm_context, texture2d_vertex_program_patched);
-		sceGxmSetFragmentProgram(gxm_context, texture2d_fragment_program_patched);
-
-		// Setting fragment uniforms for alpha test and texture environment
-		void *alpha_buffer;
-		sceGxmReserveFragmentDefaultUniformBuffer(gxm_context, &alpha_buffer);
-		sceGxmSetUniformDataF(alpha_buffer, texture2d_alpha_cut, 0, 1, &alpha_ref);
-		float alpha_operation = (float)alpha_op;
-		sceGxmSetUniformDataF(alpha_buffer, texture2d_alpha_op, 0, 1, &alpha_operation);
-		sceGxmSetUniformDataF(alpha_buffer, texture2d_tint_color, 0, 4, &current_color.r);
-		float tex_env = (float)tex_unit->env_mode;
-		sceGxmSetUniformDataF(alpha_buffer, texture2d_tex_env, 0, 1, &tex_env);
-		float fogmode = (float)internal_fog_mode;
-		sceGxmSetUniformDataF(alpha_buffer, texture2d_fog_mode, 0, 1, &fogmode);
-		sceGxmSetUniformDataF(alpha_buffer, texture2d_fog_color, 0, 4, &fog_color.r);
-		sceGxmSetUniformDataF(alpha_buffer, texture2d_tex_env_color, 0, 4, &texenv_color.r);
-		sceGxmSetUniformDataF(alpha_buffer, texture2d_fog_near, 0, 1, (const float *)&fog_near);
-		sceGxmSetUniformDataF(alpha_buffer, texture2d_fog_far, 0, 1, (const float *)&fog_far);
-		sceGxmSetUniformDataF(alpha_buffer, texture2d_fog_density, 0, 1, (const float *)&fog_density);
-
+	vglIndexPointerMapped(vtx_idx);
+	vglVertexPointerMapped(vtx_posstart);
+	vglColorPointerMapped(GL_FLOAT, vtx_colstart);
+	if (vtx_texptr != vtx_texstart) {
+		tex_unit->texture_array_state = GL_TRUE;
+		vglTexCoordPointerMapped(vtx_texstart);
 	} else {
-		// Setting proper vertex and fragment programs
-		sceGxmSetVertexProgram(gxm_context, rgba_vertex_program_patched);
-		sceGxmSetFragmentProgram(gxm_context, rgba_fragment_program_patched);
+		tex_unit->texture_array_state = GL_FALSE;
 	}
 
-	// Reserving default uniform buffer for wvp
-	int i, j;
-	void *vertex_wvp_buffer;
-	sceGxmReserveVertexDefaultUniformBuffer(gxm_context, &vertex_wvp_buffer);
+	vglDrawObjects(vtx_curprim, vtx_num, GL_TRUE);
 
-	// Checking  if we have to write a texture
-	if (model_uv != NULL) {
-		// Setting wvp matrix
-		sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_wvp, 0, 16, (const float *)mvp_matrix);
+	// restore array state
+	tex_unit->vertex_array_state = varr_state;
+	tex_unit->color_array_state = carr_state;
+	tex_unit->color_object_type = carr_type;
+	tex_unit->texture_array_state = tarr_state;
 
-		// Setting fogging uniforms
-		float clipplane0 = (float)clip_plane0;
-		sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_clip_plane0, 0, 1, &clipplane0);
-		sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_clip_plane0_eq, 0, 4, &clip_plane0_eq.x);
-		sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_mv, 0, 16, (const float *)modelview_matrix);
-		sceGxmSetUniformDataF(vertex_wvp_buffer, texture2d_texmat, 0, 16, (const float *)texture_matrix);
+	// TODO: check if we need to restore these properly
+	tex_unit->vertex_object = NULL;
+	tex_unit->color_object = NULL;
+	tex_unit->texture_object = NULL;
 
-		// Setting in use texture
-		sceGxmSetFragmentTexture(gxm_context, 0, &textures[texture2d_idx].gxm_tex);
-
-		// Properly generating vertices, uv map and indices buffers
-		vector3f *vertices;
-		vector2f *uv_map;
-		uint16_t *indices;
-		int n = 0, quad_n = 0;
-		vertexList *object = model_vertices;
-		uvList *object_uv = model_uv;
-		uint64_t idx_count = vertex_count;
-		switch (prim_extra) {
-		case SCE_GXM_PRIMITIVE_NONE:
-			vertices = (vector3f *)gpu_pool_memalign(vertex_count * sizeof(vector3f), sizeof(vector3f));
-			uv_map = (vector2f *)gpu_pool_memalign(vertex_count * sizeof(vector2f), sizeof(vector2f));
-			memset(vertices, 0, (vertex_count * sizeof(vector3f)));
-			indices = (uint16_t *)gpu_pool_memalign(idx_count * sizeof(uint16_t), sizeof(uint16_t));
-			for (i = 0; i < vertex_count; i++) {
-				memcpy_neon(&vertices[n], &object->v, sizeof(vector3f));
-				memcpy_neon(&uv_map[n], &object_uv->v, sizeof(vector2f));
-				indices[n] = n;
-				object = object->next;
-				object_uv = object_uv->next;
-				n++;
-			}
-			break;
-		case SCE_GXM_PRIMITIVE_QUADS:
-			quad_n = vertex_count >> 2;
-			idx_count = quad_n * 6;
-			vertices = (vector3f *)gpu_pool_memalign(vertex_count * sizeof(vector3f), sizeof(vector3f));
-			uv_map = (vector2f *)gpu_pool_memalign(vertex_count * sizeof(vector2f), sizeof(vector2f));
-			memset(vertices, 0, (vertex_count * sizeof(vector3f)));
-			indices = (uint16_t *)gpu_pool_memalign(idx_count * sizeof(uint16_t), sizeof(uint16_t));
-			for (i = 0; i < quad_n; i++) {
-				indices[i * 6] = i * 4;
-				indices[i * 6 + 1] = i * 4 + 1;
-				indices[i * 6 + 2] = i * 4 + 3;
-				indices[i * 6 + 3] = i * 4 + 1;
-				indices[i * 6 + 4] = i * 4 + 2;
-				indices[i * 6 + 5] = i * 4 + 3;
-			}
-			for (j = 0; j < vertex_count; j++) {
-				memcpy_neon(&vertices[j], &object->v, sizeof(vector3f));
-				memcpy_neon(&uv_map[j], &object_uv->v, sizeof(vector2f));
-				object = object->next;
-				object_uv = object_uv->next;
-			}
-			break;
-		}
-
-		// Performing the requested draw call
-		sceGxmSetVertexStream(gxm_context, 0, vertices);
-		sceGxmSetVertexStream(gxm_context, 1, uv_map);
-		sceGxmDraw(gxm_context, prim, SCE_GXM_INDEX_FORMAT_U16, indices, idx_count);
-
-	} else {
-		// Setting wvp matrix
-		sceGxmSetUniformDataF(vertex_wvp_buffer, rgba_wvp, 0, 16, (const float *)mvp_matrix);
-
-		// Properly generating vertices, colors and indices buffers
-		vector3f *vertices;
-		vector4f *colors;
-		uint16_t *indices;
-		int n = 0, quad_n = 0;
-		vertexList *object = model_vertices;
-		rgbaList *object_clr = model_color;
-		uint64_t idx_count = vertex_count;
-		switch (prim_extra) {
-		case SCE_GXM_PRIMITIVE_NONE:
-			vertices = (vector3f *)gpu_pool_memalign(vertex_count * sizeof(vector3f), sizeof(vector3f));
-			colors = (vector4f *)gpu_pool_memalign(vertex_count * sizeof(vector4f), sizeof(vector4f));
-			memset(vertices, 0, (vertex_count * sizeof(vector3f)));
-			indices = (uint16_t *)gpu_pool_memalign(idx_count * sizeof(uint16_t), sizeof(uint16_t));
-			for (i = 0; i < vertex_count; i++) {
-				memcpy_neon(&vertices[n], &object->v, sizeof(vector3f));
-				memcpy_neon(&colors[n], &object_clr->v, sizeof(vector4f));
-				indices[n] = n;
-				object = object->next;
-				object_clr = object_clr->next;
-				n++;
-			}
-			break;
-		case SCE_GXM_PRIMITIVE_QUADS:
-			quad_n = vertex_count >> 2;
-			idx_count = quad_n * 6;
-			vertices = (vector3f *)gpu_pool_memalign(vertex_count * sizeof(vector3f), sizeof(vector3f));
-			colors = (vector4f *)gpu_pool_memalign(vertex_count * sizeof(vector4f), sizeof(vector4f));
-			memset(vertices, 0, (vertex_count * sizeof(vector3f)));
-			indices = (uint16_t *)gpu_pool_memalign(idx_count * sizeof(uint16_t), sizeof(uint16_t));
-			int i, j;
-			for (i = 0; i < quad_n; i++) {
-				indices[i * 6] = i * 4;
-				indices[i * 6 + 1] = i * 4 + 1;
-				indices[i * 6 + 2] = i * 4 + 3;
-				indices[i * 6 + 3] = i * 4 + 1;
-				indices[i * 6 + 4] = i * 4 + 2;
-				indices[i * 6 + 5] = i * 4 + 3;
-			}
-			for (j = 0; j < vertex_count; j++) {
-				memcpy_neon(&vertices[j], &object->v, sizeof(vector3f));
-				memcpy_neon(&colors[j], &object_clr->v, sizeof(vector4f));
-				object = object->next;
-				object_clr = object_clr->next;
-			}
-			break;
-		}
-
-		// Performing the requested draw call
-		sceGxmSetVertexStream(gxm_context, 0, vertices);
-		sceGxmSetVertexStream(gxm_context, 1, colors);
-		sceGxmDraw(gxm_context, prim, SCE_GXM_INDEX_FORMAT_U16, indices, idx_count);
-	}
-
-	// Purging vertex, colors and texcoord lists
-	purge_vertex_list();
-	vertex_count = 0;
+	vtx_curprim = 0;
+	vtx_num = 0;
+	vtx_posstart = vtx_posptr;
+	vtx_colstart = vtx_colptr;
+	vtx_texstart = vtx_texptr;
 }
