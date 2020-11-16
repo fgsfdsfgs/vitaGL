@@ -9,7 +9,6 @@ static const struct {
 } vgl_proctable[] = {
 	{ "glActiveTexture", (void *)glActiveTexture },
 	{ "glAlphaFunc", (void *)glAlphaFunc },
-	{ "glArrayElement", (void *)glArrayElement },
 	{ "glAttachShader", (void *)glAttachShader },
 	{ "glBegin", (void *)glBegin },
 	{ "glBindBuffer", (void *)glBindBuffer },
