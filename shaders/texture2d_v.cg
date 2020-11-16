@@ -6,8 +6,10 @@
 	uniform float4 clip_plane0_eq, // In the future this can turn into an array to support other planes
 	uniform float4x4 modelview,
 	uniform float4x4 texmat,
+	uniform float4 tintColor,
 	float4 out vPosition : POSITION,
 	float2 out vTexcoord : TEXCOORD0,
+	float4 out vColor : COLOR,
 	float out vClip : CLP0)
 {
 	float4 pos4 = float4(position, 1.f);
@@ -22,4 +24,5 @@
 	
 	vPosition = mul(pos4, wvp);
 	vTexcoord = mul(texmat, float4(texcoord, 0.f, 1.f)).xy;
+	vColor = tintColor;
 }
