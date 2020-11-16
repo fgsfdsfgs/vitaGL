@@ -140,6 +140,7 @@ static const struct {
 	{ "vglDrawObjects", (void *)vglDrawObjects },
 	{ "vglIndexPointer", (void *)vglIndexPointer },
 	{ "vglIndexPointerMapped", (void *)vglIndexPointerMapped },
+	{ "vglIndexPointerImmediate", (void *)vglIndexPointerImmediate },
 	{ "vglTexCoordPointer", (void *)vglTexCoordPointer },
 	{ "vglTexCoordPointerMapped", (void *)vglTexCoordPointerMapped },
 	{ "vglVertexPointer", (void *)vglVertexPointer },

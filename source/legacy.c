@@ -35,6 +35,13 @@ static GLenum vtx_curprim = 0;
 
 vector4f current_color = { 1.0f, 1.0f, 1.0f, 1.0f }; // Current in use color
 
+void vglIndexPointerImmediate(void) {
+	if (vtx_pos == NULL) {
+		vglSetImmediateBufferSize(DEFAULT_VTX_COUNT);
+	}
+	vglIndexPointerMapped(vtx_idx);
+}
+
 void vglResetImmediateBuffer(void) {
 	if (vtx_curprim != 0) {
 		// don't reset in the middle of a model

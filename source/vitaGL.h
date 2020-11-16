@@ -434,6 +434,7 @@ void vglTexCoordPointer(GLint size, GLenum type, GLsizei stride, GLuint count, c
 void vglTexCoordPointerMapped(const GLvoid *pointer);
 void vglVertexPointer(GLint size, GLenum type, GLsizei stride, GLuint count, const GLvoid *pointer);
 void vglVertexPointerMapped(const GLvoid *pointer);
+void vglIndexPointerImmediate(void);
 
 // VGL_EXT_gxp_shaders extension implementation
 void vglBindAttribLocation(GLuint prog, GLuint index, const GLchar *name, const GLuint num, const GLenum type);
