@@ -26,7 +26,7 @@
 #define DEFAULT_VTX_COUNT 16384
 
 static GLuint vtx_max_vertices = 0;
-static unsigned short *vtx_idx;
+static unsigned short *vtx_idx, *vtx_idx_quads;
 static GLfloat *vtx_pos, *vtx_posptr, *vtx_posstart;
 static GLfloat *vtx_tex, *vtx_texptr, *vtx_texstart;
 static GLfloat *vtx_col, *vtx_colptr, *vtx_colstart;
@@ -68,17 +68,28 @@ GLboolean vglSetImmediateBufferSize(const GLuint numverts) {
 	vtx_tex = realloc(vtx_tex, sizeof(GLfloat) * 2 * numverts);
 	vtx_col = realloc(vtx_col, sizeof(GLfloat) * 4 * numverts);
 	vtx_idx = realloc(vtx_idx, sizeof(GLshort) * 1 * numverts);
+	vtx_idx_quads = realloc(vtx_idx_quads, sizeof(GLshort) * 1 * numverts);
 
-	if (!vtx_pos || !vtx_tex || !vtx_col || !vtx_idx) {
+	if (!vtx_pos || !vtx_tex || !vtx_col || !vtx_idx || !vtx_idx_quads) {
 		vgl_error = GL_OUT_OF_MEMORY;
 		return GL_FALSE;
 	}
 
-	for (GLuint i = 0; i < numverts; ++i) {
+	for (GLuint i = 0; i < numverts; ++i)
 		vtx_idx[i] = i; // indices are always sequential here
+
+	for (GLuint i = 0; i < (numverts / 6); ++i) {
+		// prepare indices for GL_QUADS
+		vtx_idx_quads[i * 6 + 0] = i * 4 + 0;
+		vtx_idx_quads[i * 6 + 1] = i * 4 + 1;
+		vtx_idx_quads[i * 6 + 2] = i * 4 + 3;
+		vtx_idx_quads[i * 6 + 3] = i * 4 + 1;
+		vtx_idx_quads[i * 6 + 4] = i * 4 + 2;
+		vtx_idx_quads[i * 6 + 5] = i * 4 + 3;
 	}
 
 	vtx_max_vertices = numverts;
+
 	vglResetImmediateBuffer();
 
 	return GL_TRUE;
@@ -94,6 +105,7 @@ void glBegin(GLenum prim) {
 		SET_GL_ERROR(GL_INVALID_OPERATION)
 	}
 
+	phase = MODEL_CREATION;
 	vtx_num = 0;
 	vtx_curprim = prim;
 }
@@ -204,7 +216,15 @@ void glEnd(void) {
 	tex_unit->vertex_array_state = GL_TRUE;
 	tex_unit->color_array_state = GL_TRUE;
 
-	vglIndexPointerMapped(vtx_idx);
+	if (vtx_curprim == GL_QUADS) {
+		// substitute indices for triangulated quads
+		vtx_curprim = GL_TRIANGLES;
+		vtx_num = (vtx_num / 4) * 6;
+		vglIndexPointerMapped(vtx_idx_quads);
+	} else {
+		vglIndexPointerMapped(vtx_idx);
+	}
+
 	vglVertexPointerMapped(vtx_posstart);
 	vglColorPointerMapped(GL_FLOAT, vtx_colstart);
 	if (vtx_texptr != vtx_texstart) {
@@ -232,4 +252,5 @@ void glEnd(void) {
 	vtx_posstart = vtx_posptr;
 	vtx_colstart = vtx_colptr;
 	vtx_texstart = vtx_texptr;
+	phase = NONE;
 }
