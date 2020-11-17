@@ -277,6 +277,14 @@ extern "C" {
 #define GL_TEXTURE_HEIGHT                     0x1001
 #define GL_TEXTURE_INTERNAL_FORMAT            0x1003
 #define GL_TEXTURE_COMPRESSED                 0x86A1
+#define GL_QUERY_COUNTER_BITS                 0x8864
+#define GL_QUERY_RESULT                       0x8866
+#define GL_QUERY_RESULT_AVAILABLE             0x8867
+#define GL_SAMPLES_PASSED                     0x8914
+#define GL_ANY_SAMPLES_PASSED                 0x8C2F
+#define GL_TIME_ELAPSED                       0x88BF
+#define GL_TIMESTAMP                          0x8E28
+#define GL_CURRENT_QUERY                      0x8865
 
 #define GL_MAX_COMBINED_TEXTURE_IMAGE_UNITS   2
 #define GL_MAX_TEXTURE_LOD_BIAS               31
@@ -376,6 +384,14 @@ void glPolygonMode(GLenum face, GLenum mode);
 void glPolygonOffset(GLfloat factor, GLfloat units);
 void glPopMatrix(void);
 void glPushMatrix(void);
+void glGenQueries(GLsizei n​, GLuint *ids​);
+void glDeleteQueries(GLsizei n, const GLuint *ids);
+void glBeginQuery(GLenum target​, GLuint id​);
+void glEndQuery(GLenum target​);
+void glGetQueryObjectuiv(GLuint id, GLenum pname, GLuint * params);
+void glGetQueryObjectiv(GLuint id, GLenum pname, GLint * params);
+void glGetQueryiv(GLenum target​, GLenum pname​, GLint * params​);
+GLboolean glIsQuery(GLuint id);
 void glReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum format, GLenum type, GLvoid *data);
 void glRotatef(GLfloat angle, GLfloat x, GLfloat y, GLfloat z);
 void glScalef(GLfloat x, GLfloat y, GLfloat z);

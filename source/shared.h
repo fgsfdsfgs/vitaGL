@@ -36,6 +36,7 @@
 #define GXM_TEX_MAX_SIZE 4096 // Maximum width/height in pixels per texture
 #define BUFFERS_ADDR 0xA000 // Starting address for buffers indexing
 #define BUFFERS_NUM 128 // Maximum number of allocatable buffers
+#define QUERIES_NUM 32 // Maximum number of query objects
 
 // Internal constants set in bootup phase
 extern int DISPLAY_WIDTH; // Display width in pixels
@@ -165,6 +166,8 @@ extern uint16_t *depth_clear_indices; // Memblock starting address for clear scr
 extern SceGxmVertexProgram *clear_vertex_program_patched; // Patched vertex program for clearing screen
 extern vector4f *clear_vertices; // Memblock starting address for clear screen vertices
 
+extern GLboolean vgl_in_scene;
+
 /* gxm.c */
 void initGxm(void); // Inits sceGxm
 void initGxmContext(void); // Inits sceGxm context
@@ -179,6 +182,8 @@ void termDepthStencilSurfaces(void); // Destroys depth and stencil surfaces for 
 void startShaderPatcher(void); // Creates a shader patcher instance
 void stopShaderPatcher(void); // Destroys a shader patcher instance
 void waitRenderingDone(void); // Waits for rendering to be finished
+void beginGxmScene(void);
+void endGxmScene(SceGxmNotification *notify);
 
 /* tests.c */
 void change_depth_write(SceGxmDepthWriteMode mode); // Changes current in use depth write mode
@@ -201,6 +206,9 @@ void resetCustomShaders(void); // Resets custom shaders
 void changeCustomShadersBlend(SceGxmBlendInfo *blend_info); // Change SceGxmBlendInfo value to all custom shaders
 void reloadCustomShader(void); // Reloads in use custom shader inside sceGxm
 void _vglDrawObjects_CustomShadersIMPL(GLenum mode, GLsizei count, GLboolean implicit_wvp); // vglDrawObjects implementation for rendering with custom shaders
+
+/* queries.c */
+GLboolean initQueries(void);
 
 /* misc functions */
 void vector4f_convert_to_local_space(vector4f *out, int x, int y, int width, int height); // Converts screen coords to local space

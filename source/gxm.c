@@ -53,6 +53,9 @@ SceGxmContext *gxm_context; // sceGxm context instance
 GLenum vgl_error = GL_NO_ERROR; // Error returned by glGetError
 SceGxmShaderPatcher *gxm_shader_patcher; // sceGxmShaderPatcher shader patcher instance
 
+SceGxmNotification vgl_frame_notify; // this gets triggered on fragment stage completion
+GLboolean vgl_in_scene = GL_FALSE;
+
 matrix4x4 mvp_matrix; // ModelViewProjection Matrix
 matrix4x4 projection_matrix; // Projection Matrix
 matrix4x4 modelview_matrix; // ModelView Matrix
@@ -387,14 +390,9 @@ void vglSetParamBufferSize(uint32_t size) {
 	gxm_param_buf_size = size;
 }
 
-void vglStartRendering(void) {
+void beginGxmScene(void) {
 	// Starting drawing scene
 	if (active_write_fb == NULL) { // Default framebuffer is used
-		if (system_app_mode) {
-			sceSharedFbBegin(shared_fb, &shared_fb_info);
-			shared_fb_info.vsync = vblank;
-			gxm_back_buffer_index = (shared_fb_info.index + 1) % 2;
-		}
 		sceGxmBeginScene(gxm_context, gxm_scene_flags, gxm_render_target,
 			NULL, NULL,
 			gxm_sync_objects[gxm_back_buffer_index],
@@ -411,6 +409,8 @@ void vglStartRendering(void) {
 		gxm_scene_flags &= ~SCE_GXM_SCENE_FRAGMENT_SET_DEPENDENCY;
 	}
 
+	vgl_in_scene = GL_TRUE;
+
 	// Setting back current viewport if enabled cause sceGxm will reset it at sceGxmEndScene call
 	sceGxmSetViewport(gxm_context, x_port, x_scale, y_port, y_scale, z_port, z_scale);
 
@@ -420,9 +420,27 @@ void vglStartRendering(void) {
 		sceGxmSetRegionClip(gxm_context, SCE_GXM_REGION_CLIP_OUTSIDE, 0, 0, DISPLAY_WIDTH - 1, DISPLAY_HEIGHT - 1);
 }
 
-void vglStopRenderingInit(void) {
+void vglStartRendering(void) {
+	// Starting drawing scene
+	if (active_write_fb == NULL) { // Default framebuffer is used
+		if (system_app_mode) {
+			sceSharedFbBegin(shared_fb, &shared_fb_info);
+			shared_fb_info.vsync = vblank;
+			gxm_back_buffer_index = (shared_fb_info.index + 1) % 2;
+		}
+	}
+	beginGxmScene();
+}
+
+void endGxmScene(SceGxmNotification *notify) {
 	// Ending drawing scene
-	sceGxmEndScene(gxm_context, NULL, NULL);
+	if (notify) ++notify->value;
+	sceGxmEndScene(gxm_context, NULL, notify);
+	vgl_in_scene = GL_FALSE;
+}
+
+void vglStopRenderingInit(void) {
+	endGxmScene(NULL);
 	if (system_app_mode && vblank)
 		sceDisplayWaitVblankStart();
 }
